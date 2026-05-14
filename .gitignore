@@ -1,0 +1,33 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+
+# Python (если builder будет править)
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+*.egg-info/
+.venv/
+venv/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temp files
+*.tmp
+*.bak
+*.log
+
+# PowerPoint temp / autosaves
+~$*.pptx
+*-Repaired*.pptx
+
+# PDF rendering temp (если будут)
+/tmp_render/
