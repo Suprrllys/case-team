@@ -103,8 +103,8 @@ def set_text(tf, text, *, size=14, bold=False, color=INK, font=FONT_BODY,
     p.line_spacing = line_spacing
     for r in list(p.runs):
         r._r.getparent().remove(r._r)
-    add_run(p, text, size=size, bold=bold, color=color, font=font,
-            italic=italic)
+    add_runs_with_links(p, text, size=size, bold=bold, color=color, font=font,
+                        italic=italic)
     return p
 
 
@@ -118,12 +118,55 @@ def add_paragraph(tf, text, *, size=14, bold=False, color=INK, font=FONT_BODY,
         p.space_before = Pt(space_before)
     if bullet:
         add_run(p, "•  ", size=size, color=PRIMARY_DARK, font=font, bold=True)
-        add_run(p, text, size=size, bold=bold, color=color, font=font,
-                italic=italic)
-    else:
-        add_run(p, text, size=size, bold=bold, color=color, font=font,
-                italic=italic)
+    add_runs_with_links(p, text, size=size, bold=bold, color=color, font=font,
+                        italic=italic)
     return p
+
+
+MD_LINK_RE = re.compile(r'\[([^\]]+)\]\(([^)]+)\)')
+
+
+def add_runs_with_links(paragraph, text, *, size=14, bold=False, color=INK,
+                        font=FONT_BODY, italic=False):
+    """Парсит markdown-ссылки [текст](url) в строке и рендерит их как
+    кликабельные runs с синим цветом + подчёркиванием. Остальной текст —
+    обычный run с заданным color.
+
+    Возвращает список созданных runs.
+    """
+    runs = []
+    last_end = 0
+    for m in MD_LINK_RE.finditer(text):
+        # Текст до ссылки
+        if m.start() > last_end:
+            plain = text[last_end:m.start()]
+            if plain:
+                runs.append(add_run(paragraph, plain, size=size, bold=bold,
+                                    color=color, font=font, italic=italic))
+        # Ссылка
+        link_text = m.group(1)
+        link_url = m.group(2)
+        r = add_run(paragraph, link_text, size=size, bold=bold,
+                    color=LINK_BLUE, font=font, italic=italic,
+                    hyperlink=link_url)
+        # Подчёркивание для визуальной идентификации ссылки
+        try:
+            r.font.underline = True
+        except Exception:
+            pass
+        runs.append(r)
+        last_end = m.end()
+    # Остаток текста после последней ссылки
+    if last_end < len(text):
+        tail = text[last_end:]
+        if tail:
+            runs.append(add_run(paragraph, tail, size=size, bold=bold,
+                                color=color, font=font, italic=italic))
+    # Если в строке не было ни одной ссылки — добавить как обычный текст
+    if not runs:
+        runs.append(add_run(paragraph, text, size=size, bold=bold,
+                            color=color, font=font, italic=italic))
+    return runs
 
 
 def add_rect(slide, x, y, w, h, *, fill=None, line=None, radius=None,
@@ -354,7 +397,7 @@ def build_slide_02_exec(prs):
     blocks = [
         ("АНАЛИЗ", "266 тыс компаний МСП в РФ принимают стратегические решения 2-6 раз в год; 5 текущих способов не дают сшитого пакета под защиту."),
         ("КОНЦЕПЦИЯ", "5 Claude-агентов готовят презентации, финмодели, аналитику и позиционирование. Решение go/no-go и защита перед людьми остаются за человеком."),
-        ("РЕАЛИЗАЦИЯ", "5 ролей · обучены на решениях для Axenix (Cup Moscow 2024) и Askona (Inno Case Hack 2025) · 26 методологических логик в каталоге команды."),
+        ("РЕАЛИЗАЦИЯ", "5 ролей · обучены на решениях для Axenix (Cup Moscow 2024) и Askona (Inno Case Hack 2025) · 26 методологических логик — [открытый репозиторий](https://github.com/Suprrllys/case-team)."),
         ("ЭФФЕКТ", "4 часа вместо 5-6 дней · в стоимости подписки на нейросеть · устойчиво 84-98% экономии при ±20% к параметрам."),
     ]
     card_w = Inches(6.05)
@@ -538,7 +581,7 @@ def build_slide_04_concept(prs):
     arch = [
         ("01", "Куратор смысла", "Менеджер-агент решает, что класть на слайды. Это ответ на 85% failure rate автономных агентов (Devin)."),
         ("02", "Физические артефакты", ".xlsx с формулами, .pptx готов к показу, .md Decision Log — а не текст в чате."),
-        ("03", "Дотренировка на 2 кейс-чемпионатах", "Решения для Axenix (Cup Moscow 2024) и Askona (Inno Case Hack 2025) → 26 методологических логик."),
+        ("03", "Дотренировка на 2 кейс-чемпионатах", "Решения для Axenix (Cup Moscow 2024) и Askona (Inno Case Hack 2025) → 26 методологических логик в [открытом репозитории](https://github.com/Suprrllys/case-team)."),
         ("04", "Иерархия источников", "Эталон → бизнес-классика (Osterwalder, MoSCoW, AS-IS/TO-BE) → эвристика. Каждое правило ссылается на источник."),
     ]
     aw = Inches(3.05)
@@ -637,7 +680,7 @@ def build_slide_05_realization(prs):
     # Сноска про дотренировку
     note_y = Inches(6.55)
     add_textbox(s, Inches(0.55), note_y, Inches(12.2), Inches(0.50),
-                text="Дотренировка — на решениях для Axenix (Cup Moscow 2024) и Askona (Inno Case Hack 2025) с кейс-чемпионатов. Извлечено 26 методологических логик — разбор каждой откроем в репозитории после конкурса.",
+                text="Дотренировка — на решениях для Axenix (Cup Moscow 2024) и Askona (Inno Case Hack 2025) с кейс-чемпионатов. Извлечено 26 методологических логик — материалы в [открытом репозитории github.com/Suprrllys/case-team](https://github.com/Suprrllys/case-team).",
                 size=11, color=INK_2, line_spacing=1.30)
 
     draw_footer(s, 5)
@@ -881,7 +924,7 @@ def build_slide_08_team(prs):
                 text="+7 (985) 176-06-58", size=12, color=WHITE)
     add_textbox(s, Inches(7.10), cy + Inches(0.10),
                 Inches(5.7), Inches(0.32),
-                text="SourceCraft-репозиторий: публикация после конкурса",
+                text="GitHub: [github.com/Suprrllys/case-team](https://github.com/Suprrllys/case-team)",
                 size=11, color=RGBColor(0xCC, 0xCC, 0xCC))
     add_textbox(s, Inches(7.10), cy + Inches(0.44),
                 Inches(5.7), Inches(0.32),
@@ -1260,7 +1303,7 @@ def build_appendix_a1_segment(prs, slide_num):
         ty += Inches(0.70)
     add_textbox(s, x2 + Inches(0.20), ty, col_w - Inches(0.40),
                 Inches(0.60),
-                text="Частотность Core Job: 2-6 раз в год на одного фаундера (extract-jobs-from-reviews).",
+                text="Частотность работы: 2-6 раз в год — [граф работ из отзывов клиентов на конкурентов](https://github.com/Suprrllys/case-team/blob/main/solution/analyst/jobs-and-segments-analysis.md).",
                 size=10, italic=True, color=INK_2, line_spacing=1.25)
 
     # Колонка 3 — Критерии успеха
@@ -1345,7 +1388,7 @@ def build_appendix_a2_competitors(prs, slide_num):
 
     note_y = Inches(6.90)
     add_textbox(s, Inches(0.55), note_y, SLIDE_W - Inches(1.10), Inches(0.40),
-                text="Полная матрица 8 критериев × 9 конкурентов — по запросу к автору; будет опубликована в репозитории после конкурса.",
+                text="Полная матрица 8 критериев × 9 конкурентов — в [открытом репозитории](https://github.com/Suprrllys/case-team/blob/main/solution/analyst/practicum-award-context.md).",
                 size=10, italic=True, color=INK_2, line_spacing=1.25)
     draw_footer(s, slide_num)
 
@@ -1454,7 +1497,7 @@ def build_appendix_a4_finmodel(prs, slide_num):
              fill=PRIMARY_SOFT, radius=0.06)
     add_textbox(s, Inches(0.75), note_y + Inches(0.10), SLIDE_W - Inches(1.50),
                 Inches(0.30),
-                text="SENSITIVITY ±20% по 3 параметрам — устойчиво 84-98% экономии vs in-house. Все источники цифр (Anthropic Pricing, ЦБ РФ, dreamjob.ru, fless.pro) — Приложение A0.",
+                text="SENSITIVITY ±20% — устойчиво 84-98% vs in-house. Источники — A0. [Полная финмодель](https://github.com/Suprrllys/case-team/blob/main/solution/financier/unit-economics.md) в открытом репозитории.",
                 size=11, color=PRIMARY_DARK, line_spacing=1.25,
                 anchor=MSO_ANCHOR.MIDDLE)
 
@@ -1513,7 +1556,7 @@ def build_appendix_a6_roadmap(prs, slide_num):
             "Реальная подача в Practicum Award собрана этой командой",
         ]),
         ("NEXT · 1-3 мес", PRIMARY_SOFT, [
-            "Публикация открытой методологии на SourceCraft",
+            "Публикация агентов и skill целиком в [github.com/Suprrllys/case-team](https://github.com/Suprrllys/case-team) (сейчас опубликованы материалы заявки)",
             "Расширение эталонной базы (антикризис, M&A, креативный бренд)",
             "3-5 pilot-запусков с B2B-клиентами в обмен на кейс-стади",
         ]),
